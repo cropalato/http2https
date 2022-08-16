@@ -1,0 +1,83 @@
+name: Merged PR
+on:
+  pull_request:
+    branches:
+      - "main"
+    types: [opened, synchronize, closed]
+jobs:
+  build-project:
+    if: ((github.event.action == 'closed' && github.event.pull_request.merged == true))
+    strategy:
+      matrix:
+        go: [1.18]
+        os: [ubuntu]
+    name: Build golang application
+    runs-on: ${{ matrix.os}}-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+      - run: go build -o http2https-${{ matrix.os }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: http2https-${{ matrix.os }}
+          path: ./
+  release-project:
+    if: ((github.event.action == 'closed' && github.event.pull_request.merged == true))
+    strategy:
+      matrix:
+        #os: [macos, windows, ubuntu]
+        os: [ubuntu]
+    name: Release golang application
+    runs-on: ubuntu-latest
+    needs: build-project
+    steps:
+      - name: Download applications
+        uses: actions/download-artifact@v3
+      - run: ls -la 
+      - name: Create Github release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "v1.0.${{ github.event.pull_request.number }}"
+          allowUpdates: true
+          artifacts: "**/http2https-*"
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: cropalato/http2https
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          builder: ${{ steps.buildx.outputs.name }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          # labels: ${{ steps.meta.outputs.labels }}
+          # cache-from: type=local,src=/tmp/.my-buildx-cache
+          # cache-to: type=local,dest=/tmp/.my-buildx-cache
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
+                                                                                                   
