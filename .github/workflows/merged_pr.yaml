@@ -81,9 +81,7 @@ jobs:
           #push: ${{ github.event_name != 'pull_request' }}
           push: true
           tags: cropalato/http2https:latest
-          #tags: ${{ steps.meta.outputs.tags }}
           # labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=local,src=./app
           # cache-to: type=local,dest=/tmp/.my-buildx-cache
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
