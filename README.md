@@ -18,4 +18,3 @@ You can do something like:
 ./http2https -url https://ifconfig.info -proxy http://localhost:3128
 ```
 
-
