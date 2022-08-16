@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -41,10 +41,10 @@ func forwardToTls(w http.ResponseWriter, r *http.Request) {
 			Transport: &http.Transport{Proxy: http.ProxyURL(proxy)},
 		}
 	}
-	data, _ := ioutil.ReadAll(r.Body)
+	data, _ := io.ReadAll(r.Body)
 	fmt.Printf("Body=%v\n", data)
 	bodyReader := bytes.NewReader(data)
-	req, err := http.NewRequest(r.Method, forwardUrl+r.RequestURI, bodyReader)
+	req, _ := http.NewRequest(r.Method, forwardUrl+r.RequestURI, bodyReader)
 	for k, v := range r.Header {
 		if strings.ToUpper(k) == "host" {
 			continue
@@ -65,11 +65,14 @@ func forwardToTls(w http.ResponseWriter, r *http.Request) {
 		os.Exit(1)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	//resp.Body.Close()
 	client.CloseIdleConnections()
 	fmt.Printf("[%v] Forward answer was=%v\n", resp.StatusCode, string(body))
-	w.Write(body)
+	_, err = w.Write(body)
+	if err != nil {
+		fmt.Printf("Error writing http response body. %v\n", err)
+	}
 	w.WriteHeader(resp.StatusCode)
 	for k, v := range resp.Header {
 		if len(v) > 1 {
